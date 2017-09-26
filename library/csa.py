@@ -1,15 +1,62 @@
-import libAccessibility
-import libCSA
-from libAccessibility import arrayTimeCompute, areaTimeCompute,functionComputeVel
-from libAccessibility import popMean, areaMean, tMean,popMeanHalf, areaMeanHalf, tMeanHalf
-from libAccessibility import computeVel,computeVelHalf, computeVelGall
-from libCSA import myhexgrid, dist2Point, reduceHexsInShell, reduceHexsInShellFast, area_geojson
+from libAccessibility import arrayTimeCompute, ListFunctionAccessibility
+from libCSA import area_geojson
+
 import math
 import time
 
 inf = 10000000
 
-def computeVelOnePoint(point, startTime, timeS, timeP, P2PTime, P2PPos, P2SPos, P2STime):
+from numba import jit, int32,int64
+
+@jit(int32[:](int32[:],int32[:],int32[:,:],int32[:,:]), nopython = True)
+def computePointTime(timePP, timeSS, P2SPos, P2STime ):
+    #global P2SPos
+    #global P2STime
+    maxRow = len(P2SPos[0])
+    for p_i in range(len(timePP)):
+        ListNeighP_i = P2SPos[p_i]
+        for stop_i in range(maxRow):
+            stop = int(ListNeighP_i[stop_i])
+            if stop == -2:
+                break
+            else:
+                timePP[p_i] = min(timePP[p_i], timeSS[stop] + P2STime[p_i][stop_i])
+    return timePP
+
+@jit(int32[:](int32[:],int32,int64[:,:],int32[:,:],int32[:,:]), nopython = True)
+def coreCSA(timesValues, timeStart, arrayCC, S2SPos, S2STime):
+    #print 'inter'
+    #global arrayCC
+    #arrayCC = CC
+    #global S2SPos
+    #global S2STime
+    count = 0
+    timesValuesN = numpy.copy(timesValues)
+    for c_i in range(len(arrayCC)):
+        c = arrayCC[c_i]
+        Pstart_i = c[2]
+        if timesValues[Pstart_i] <= c[0] or timesValuesN[Pstart_i] <= c[0]:
+            count += 1
+            Parr_i = c[3]
+            if timesValues[Parr_i] > c[1]:
+                timesValues[Parr_i] = c[1]
+                for neigh_i in range(len(S2SPos[Parr_i])):
+                    if S2SPos[Parr_i][neigh_i] != -2:
+                        neigh = S2SPos[Parr_i][neigh_i]
+                        neighTime = timesValuesN[neigh]
+                        if neighTime > c[1] + S2STime[Parr_i][neigh_i]:
+                            timesValuesN[neigh] = c[1] + S2STime[Parr_i][neigh_i]
+                    else:
+                         break
+                      
+    for i,t in enumerate(timesValues):
+        if t > timesValuesN[i]:
+            timesValues[i] = timesValuesN[i]
+            #print('less!!')
+    return timesValues
+
+
+def computeVelOnePoint(point, startTime, timeS, timeP,arrayCC, P2PPos, P2PTime,  P2SPos, P2STime, S2SPos, S2STime):
     timeS.fill(inf)  #Inizialize the time of stop
     timeP.fill(inf)
     posPoint = point['pos'] #position of the point in the arrays
@@ -26,16 +73,18 @@ def computeVelOnePoint(point, startTime, timeS, timeP, P2PTime, P2PPos, P2SPos, 
 
     #timeSInit = timeS.copy()
 
-    timeS = tree(timeS,startTime)
-    timeP = computePointTime(timeP, timeS)
+    timeS = coreCSA(timeS,startTime,arrayCC, S2SPos, S2STime)
+    timeP = computePointTime(timeP, timeS, P2SPos, P2STime)
     return timeP
 
-def computeVel(startTime, timeS, timeP, P2PTime, P2PPos, P2SPos, P2STime, gtfsDB, computeIsochrone, first):
+
+
+def computeVel(city, startTime, timeS, timeP, arrayCC, P2PPos, P2PTime, P2SPos, P2STime, S2SPos, S2STime, gtfsDB, computeIsochrone, first):
     maxVel = 0
     totTime = 0.
     avgT = 0 
-    tot = gtfsDB['points'].find({'city':city}).count()
-    
+    tot = len(timeP)
+    areaHex = area_geojson(gtfsDB['points'].find_one({'city':city})['hex'])
     count = 0
     for point in gtfsDB['points'].find({'city':city},{'pointN':0, 'stopN':0}).sort([('pos',1)]):
 
@@ -43,69 +92,26 @@ def computeVel(startTime, timeS, timeP, P2PTime, P2PPos, P2SPos, P2STime, gtfsDB
 
         #Inizialize the time of stop and point 
         
-        timeP = computeVelOnePoint(point, startTime, timeS, timeP, P2PTime, P2PPos, P2SPos, P2STime)
-
+        timeP = computeVelOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos,P2PTime, P2SPos, P2STime, S2SPos, S2STime)
         timePReached = timeP - startTime    
-        
-        valuesVel = ['vel','velHalf','velGall','areaMean','areaMeanHalf']
-        valuesPop = ['popMean','popMeanHalf']
-        valuesTime = ['tMean','tMeanHalf']
-        
-        areasTime = areaTimeCompute(timePReached)
-        popsTime = arrayTimeCompute(timePReached, popArray)
-        
-        
+                        
         toUpdate = {}
-        timeStartStr = str(startTime)
-        for field in valuesVel:
-            #print field
+        timeStartStr = str(startTime)  
+        listAccessibility = ['velocityScore']
+        for field in listAccessibility:
             if first:
-                #print first
                 toUpdate[field] = {}
             else:
                 if field in point:
                     toUpdate[field] = point[field]
             
             if field in toUpdate:
-                #print toUpdate
-                toUpdate[field][timeStartStr] = functionComputeVel[field](areasTime, areaHex)
+                toUpdate[field][timeStartStr] = ListFunctionAccessibility[field](timePReached, areaHex)
             else:
                 #print 'else'
-                toUpdate[field] = {timeStartStr : functionComputeVel[field](areasTime, areaHex)}
+                toUpdate[field] = {timeStartStr : ListFunctionAccessibility[field](timePReached, areaHex)}
         
-        for field in valuesPop:
-            if first:
-                toUpdate[field] = {}
-            else:
-                if field in point:
-                    toUpdate[field] = point[field]
-            if field in toUpdate:
-                toUpdate[field][timeStartStr] = functionComputeVel[field](popsTime)
-            else:
-                toUpdate[field] = {timeStartStr : functionComputeVel[field](popsTime)}
-
-        for field in valuesTime:
-            if first:
-                toUpdate[field] = {}
-            else:
-                if field in point:
-                    toUpdate[field] = point[field]
-            if field in toUpdate:
-                toUpdate[field][timeStartStr] = functionComputeVel[field](areasTime)
-            else:
-                toUpdate[field] = {timeStartStr : functionComputeVel[field](areasTime)}            
         #print toUpdate
-
-        '''vel = computeVel
-        velHalf = computeVelHalf(areasTime,areaHex)
-        vAvgGall = computeVelGall(areasTime, areaHex)
-        popMeanVal = popMean(popsTime)
-        areaMeanVal = areaMean(areasTime, areaHex)
-        popMeanValHalf = popMeanHalf(popsTime)
-        areaMeanValHalf = areaMeanHalf(areasTime, areaHex)
-        tMeanVal =  tMean(areasTime)
-        tMeanValHalf =  tMeanHalf(areasTime)'''
-
         if (computeIsochrone):#(gtfsDB['isochrones'].find({'_id':point['_id']}).count() == 0):#
             geojson = {"type": "Feature", "geometry": {"type": "Polygon","coordinates": []}}
             for i, t in enumerate(timeP):
@@ -121,12 +127,4 @@ def computeVel(startTime, timeS, timeP, P2PTime, P2PPos, P2SPos, P2STime, gtfsDB
         m = (tot - count)*avgT/(60) - h * 60
 
         count += 1
-        maxVel = max(maxVel,toUpdate['velHalf'][timeStartStr])
-        print ('\r {0}, vel : {1:.1f}, velHalf : {2:.1f} popMean {3:.2f}, maxVelHalf {6:.1f}, Preached :{7:.1f}% \
-        Rem : {4:.1f}h, {5:.1f} m'.format(count, toUpdate['vel'][timeStartStr],
-                                          toUpdate['velHalf'][timeStartStr],
-                                          toUpdate['popMean'][timeStartStr], 
-                                          h,m,maxVel, 100.*len(timeP[timeP < inf])/len(timeP)),end="\r")
-
-
-    print ('\n \n \n', totTime / count, totTime)
+        print('point: {0}, Velocity Score : {1:.1f}, time to finish : {2:.1f}h, {3:.1f} m'.format(count, toUpdate['velocityScore'][timeStartStr], h, m), end="\r")
