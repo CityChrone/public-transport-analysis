@@ -1,8 +1,9 @@
 from libAccessibility import arrayTimeCompute, ListFunctionAccessibility
-from libCSA import area_geojson
+from libHex import area_geojson
 
 import math
 import time
+import numpy
 
 inf = 10000000
 
@@ -24,7 +25,7 @@ def computePointTime(timePP, timeSS, P2SPos, P2STime ):
     return timePP
 
 @jit(int32[:](int32[:],int32,int64[:,:],int32[:,:],int32[:,:]), nopython = True)
-def coreCSA(timesValues, timeStart, arrayCC, S2SPos, S2STime):
+def coreICSA(timesValues, timeStart, arrayCC, S2SPos, S2STime):
     #print 'inter'
     #global arrayCC
     #arrayCC = CC
@@ -73,13 +74,21 @@ def computeVelOnePoint(point, startTime, timeS, timeP,arrayCC, P2PPos, P2PTime, 
 
     #timeSInit = timeS.copy()
 
-    timeS = coreCSA(timeS,startTime,arrayCC, S2SPos, S2STime)
+    #print("timeS {0},startTime {1},arrayCC {2}, S2SPos {3}, S2STime {4}".format(timeS,startTime,arrayCC, S2SPos, S2STime))
+    timeS = coreICSA(timeS,startTime,arrayCC, S2SPos, S2STime)
     timeP = computePointTime(timeP, timeS, P2SPos, P2STime)
     return timeP
 
+def computeVel(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, first):
+    timeS = arraySP[0]
+    timeP = arraySP[1]
+    S2SPos = arraySP[2]
+    S2STime = arraySP[3]
+    P2PPos = arraySP[4]
+    P2PTime = arraySP[5]
+    P2SPos = arraySP[6]
+    P2STime = arraySP[7]
 
-
-def computeVel(city, startTime, timeS, timeP, arrayCC, P2PPos, P2PTime, P2SPos, P2STime, S2SPos, S2STime, gtfsDB, computeIsochrone, first):
     maxVel = 0
     totTime = 0.
     avgT = 0 

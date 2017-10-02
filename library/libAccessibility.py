@@ -31,8 +31,8 @@ def computeVelocityScore(timePReached, areaHex):
     for time_i in range(len(areasTime)):
         area_new += areasTime[time_i]*areaHex;
         if time_i > 0:
-            vAvg += tDistrNHalf(time_i) * (1./time_i)*(math.sqrt(area_new/math.pi));
-            integralWindTime += tDistrNHalf(time_i);
+            vAvg += tDistrNVelocityScore(time_i) * (1./time_i)*(math.sqrt(area_new/math.pi));
+            integralWindTime += tDistrNVelocityScore(time_i);
     vAvg /= integralWindTime;
     vAvg *= 3600.;
     return vAvg

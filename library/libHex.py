@@ -1,7 +1,8 @@
 import math 
 from geopy.distance import vincenty,great_circle
 from shapely.geometry import Polygon, MultiPolygon, Point, mapping
-
+import pymongo as pym
+import requests
 #utility function fro making hexGrid
 
 #Center should be [x, y]
@@ -51,7 +52,6 @@ def hexagonalGrid(bbox, cell,gtfsDBStops, distanceS, city):
     x_count = int(math.ceil(x_span))
     if round(x_span) == x_count: 
         x_count += 1
-  
 
     x_adjust = ((x_count * x_interval - radius/2.) - box_width)/2. - radius/2.
 
@@ -60,13 +60,11 @@ def hexagonalGrid(bbox, cell,gtfsDBStops, distanceS, city):
     y_adjust = (box_height - y_count * hex_height)/2.
 
     hasOffsetY = y_count * hex_height - box_height > hex_height/2.
-    #print hasOffsetY
     if hasOffsetY: 
         y_adjust -= hex_height/4.
 
     fc = []
     listPoint = []
-    print( x_count, y_count, x_count*y_count)
     count_ins = 0
     for x in range(0, x_count):
         for y in range(0,y_count+1):
@@ -111,10 +109,98 @@ def hexagonalGrid(bbox, cell,gtfsDBStops, distanceS, city):
                 fc.append(myhex)
                 count_ins+=1
                     
-            print ('{0}%, tot = {1}, inserted = {2}'.format((float(x*y_count)+float(y))/(x_count*y_count),(float(x*y_count)+float(y)) , count_ins),end="\r")
+            print ('{0:.1f}%, tot = {1}, inserted = {2}'.format(100.*(float(x*y_count)+float(y))/(x_count*y_count),(float(x*y_count)+float(y)) , count_ins), end="\r")
     
     return MultiPolygon(fc), listPoint
 
+def insertPoints(pointBin, city, gtfsDB):
+    gtfsDB['points'].delete_many({'city':city})
+    gtfsDB['points'].insert_many(pointBin)
+    gtfsDB['points'].create_index([("point", pym.GEOSPHERE)])
+    gtfsDB['points'].create_index([("served", pym.ASCENDING)])
+    gtfsDB['points'].create_index([("city", pym.ASCENDING)])
+
+def pointsServed(gtfsDB, stopsList, urlServerOsrm, distanceS, tS, city):
+    hexTemp = gtfsDB['points']
+    tot = len(stopsList)
+    count  = 0
+    url = urlServerOsrm + "table/v1/foot/";
+    hexTemp.update_many({'city':city},{'$set':{'served':False}})
+    updatedPoints = 0
+    for stop in stopsList:
+        lonLatStart = [float(stop[2]), float(stop[1])]
+        latLonStart = [float(stop[1]), float(stop[2])]
+        tempUrl = url + str(latLonStart[1]) + ','+str(latLonStart[0]) + ';'
+        searchNear ={
+            'city' : city,
+            'served' : False,
+            'point' : {'$near': {
+             '$geometry': {
+                'type': "Point" ,
+                'coordinates': lonLatStart
+             },
+             '$maxDistance': distanceS,
+             '$minDistance': 0
+          }},
+                    }
+        listPoint = []
+        for point in hexTemp.find(searchNear):
+            lonLatEnd = point['point']['coordinates']
+            tempUrl += str(lonLatEnd[0]) + ','+str(lonLatEnd[1]) + ';'
+            listPoint.append(point['_id'])
+        #print tempUrl[:-1] + '?sources=0'
+        if(len(listPoint)>0):
+            result = requests.get(tempUrl[:-1] + '?sources=0')
+            countStopNear = 0
+            #print result, tempUrl[:-1] + '?sources=0'
+            if 'durations' in result.json():
+                for i,t in enumerate(result.json()['durations'][0][1:]):
+                    if t:
+                        if t < tS:
+                            hexTemp.update_one({'_id':listPoint[i]},{'$set':{'served':True}})
+                            updatedPoints += 1
+        print ('\r tot {0}, {1:.2f}%, updated {2}'.format(tot, 100.*count/tot, updatedPoints),end="\r")
+        count += 1
+        
+        tot = hexTemp.find({'served':True, 'city':city}).count()
+    count = 0
+    coorHex =  hexTemp.find_one({'city':city, 'served': True})['hex']['coordinates']
+    distMax = 1.1 * 1000. * dist2Point(coorHex[0][0], coorHex[0][1])
+    urlBase = urlServerOsrm + 'nearest/v1/foot/'
+    listServedTrue = list(hexTemp.find({'served':True, 'city':city}))
+    CountOut = 0
+    for hexP in hexTemp.find({'served':True, 'city':city}):
+        coorP = hexP['point']['coordinates']
+        url = urlBase + str(coorP[0]) + ',' + str(coorP[1])
+        result = requests.get(url)
+        if result.json()['waypoints'][0]['distance'] > distMax:
+            #print result.json(), url
+            CountOut += 1
+            hexTemp.update_one({'_id':hexP['_id']},{'$set':{'served':False, 'out': True}})
+        print ('\r tot {1},{0:.0f}%, removed {2} '.format(100.*count/tot,count, CountOut),end="\r")
+        count += 1
+    gtfsDB['points'].delete_many({'served':False, 'city':city})
+
+def settingHexsPos(gtfsDB, city):
+    pos = 0
+    for point in gtfsDB['points'].find({'served':True, 'city' : city}).sort([('_id', pym.ASCENDING)]):
+        gtfsDB['points'].update_one({'_id':point['_id']},{'$set':{'pos':pos, 'inCityBorder':True}})
+        pos += 1
+        print ('\r {0}'.format(pos),end="\r")
+    gtfsDB['points'].create_index([("pos", pym.ASCENDING)])
+
+    
+def showHexs(gtfsDB, city, zoom_start = 9):
+    lonlat = gtfsDB['points'].find_one({'served':True, 'city':city})['point']['coordinates']
+    latlon = [lonlat[1], lonlat[0]]
+    map_osm = folium.Map(location=latlon, zoom_start=zoom_start)
+    listHex = []
+    for point in gtfsDB['points'].find({'served':True, 'city':city}, {'pointN':0, 'stopN':0}):
+        listHex.append(point)
+    res = unionHexs(listHex)
+    map_osm.choropleth(res, fill_color='red',fill_opacity=0.6, line_color='null',line_weight=2, line_opacity=0)
+    return map_osm
+    
 #Utility function for isochrone generation 
 import folium
 shellIso = [-1, 0, 900, 1800, 2700, 3600,4500, 5400, 6300,7200, 1000000000]
