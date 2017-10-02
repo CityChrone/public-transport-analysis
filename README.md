@@ -4,6 +4,8 @@ This repository contains a jupyter notebook and all the related libraries to per
 
 Take a look at the <a href="http://nbviewer.jupyter.org/github/ocadni/public-transport-analysis/blob/master/public-transport-city.ipynb" target="_blank">demo</a> of the notebook for the city of Budapest.
 
+![budapest image](./budapest.png)
+
 ## Prerequisites
 1. [python 3.x](https://www.python.org/download/releases/3.0/)
 1. [jupyter](http://jupyter.org/)
@@ -13,12 +15,11 @@ Take a look at the <a href="http://nbviewer.jupyter.org/github/ocadni/public-tra
 
 ## installation
 1. clone the repository.
-1. Install a mongoDB datatase (or use an existing one), and the osrm-backend.
 1. Download [openstreetmap](openstreetmap.org) extract (the .pbf file) of the city/region of interest. ->[repository of osm extract: [geofabrik](http://download.geofabrik.de/) -- [mapzen](https://mapzen.com/data/metro-extracts/]).
-1. Save the extract in the folder osrm of the current repository. Run on the terminal in osrm folder (Compile the street graph and run the osrm backend):
-	1. ```osrm-extract -p ./profiles/foot.lua nameFileExtract.pbf```
-	1. ```osrm-contract nameFileExtract.pbf```
-	1. ```osrm-routed nameFileExtract.osrm --port 5000```
+1. Save the extract in the folder "osrm" of the current repository. Run on the terminal in osrm folder (Compile the street graph and run the osrm backend):
+	1. ```osrm-extract -p ./profiles/foot.lua budapest_hungary.osm.pbf```
+	1. ```osrm-contract budapest_hungary.osm.pbf```
+	1. ```osrm-routed budapest_hungary.osrm --port 5000```
 5. run ```jupyter-notebook``` and open the public-transport-analysis notebook.
 6. Set the variable listed at the start of the notebook:
 	1. ```city = 'Budapest' # name of the city```
