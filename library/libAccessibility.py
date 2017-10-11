@@ -21,9 +21,14 @@ def tDistrNVelocityScore(t):
     global normVelocityScore
     return tDistrVelocityScore(t) / normVelocityScore
 
+@jit()
+def tDistrNSocialityScore(t):
+    return tDistrNVelocityScore(t)
+
 
 @jit()
-def computeVelocityScore(timePReached, areaHex):
+def computeVelocityScore(timePReached, data):
+    areaHex = data['areaHex']
     area_new = 0
     vAvg = 0
     integralWindTime = 0
@@ -60,6 +65,19 @@ def arrayTimeCompute(timePR, arrayW):
             pass
     return aTime
 
+@jit()
+def computeSocialityScore(timePR, data):
+    arrayW = data['arrayPop']
+    popComul = 0
+    popMean = 0
+    popsTime = arrayTimeCompute(timePR, arrayW)
+    for time_i in range(len(popsTime)):
+        popComul += popsTime[time_i];
+        popMean += tDistrNSocialityScore(time_i) * popComul;
+    return popMean
+
+
 ListFunctionAccessibility = {
     'velocityScore' : computeVelocityScore,
+    'socialityScore': computeSocialityScore
 };

@@ -57,7 +57,7 @@ def coreICSA(timesValues, timeStart, arrayCC, S2SPos, S2STime):
     return timesValues
 
 
-def computeVelOnePoint(point, startTime, timeS, timeP,arrayCC, P2PPos, P2PTime,  P2SPos, P2STime, S2SPos, S2STime):
+def coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos, P2PTime,  P2SPos, P2STime, S2SPos, S2STime):
     timeS.fill(inf)  #Inizialize the time of stop
     timeP.fill(inf)
     posPoint = point['pos'] #position of the point in the arrays
@@ -79,15 +79,15 @@ def computeVelOnePoint(point, startTime, timeS, timeP,arrayCC, P2PPos, P2PTime, 
     timeP = computePointTime(timeP, timeS, P2SPos, P2STime)
     return timeP
 
-def computeVel(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, first):
-    timeS = arraySP[0]
-    timeP = arraySP[1]
-    S2SPos = arraySP[2]
-    S2STime = arraySP[3]
-    P2PPos = arraySP[4]
-    P2PTime = arraySP[5]
-    P2SPos = arraySP[6]
-    P2STime = arraySP[7]
+def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, first):
+    timeS = arraySP['timeS']
+    timeP = arraySP['timeP']
+    S2SPos = arraySP['S2SPos']
+    S2STime = arraySP['S2STime']
+    P2PPos = arraySP['P2PPos']
+    P2PTime = arraySP['P2PTime']
+    P2SPos = arraySP['P2SPos']
+    P2STime = arraySP['P2STime']
 
     maxVel = 0
     totTime = 0.
@@ -95,18 +95,28 @@ def computeVel(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, firs
     tot = len(timeP)
     areaHex = area_geojson(gtfsDB['points'].find_one({'city':city})['hex'])
     count = 0
+    
+    countPop = 0
+    arrayPop = numpy.full(len(timeP), -2, dtype = numpy.float64)
+    for point in gtfsDB['points'].find({'city':city},projection={'pointN': False, 'stopN':False}).sort([('pos',1)]):
+        arrayPop[countPop] = point['pop']
+        countPop += 1
+    
     for point in gtfsDB['points'].find({'city':city},{'pointN':0, 'stopN':0}).sort([('pos',1)]):
 
         timeStart0 = time.time()
 
         #Inizialize the time of stop and point 
         
-        timeP = computeVelOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos,P2PTime, P2SPos, P2STime, S2SPos, S2STime)
+        timeP = coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos,P2PTime, P2SPos, P2STime, S2SPos, S2STime)
         timePReached = timeP - startTime    
                         
         toUpdate = {}
         timeStartStr = str(startTime)  
-        listAccessibility = ['velocityScore']
+        
+        listAccessibility = ['velocityScore', 'socialityScore']
+        data = {'areaHex':areaHex, 'arrayPop':arrayPop}
+        
         for field in listAccessibility:
             if first:
                 toUpdate[field] = {}
@@ -115,10 +125,10 @@ def computeVel(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, firs
                     toUpdate[field] = point[field]
             
             if field in toUpdate:
-                toUpdate[field][timeStartStr] = ListFunctionAccessibility[field](timePReached, areaHex)
+                toUpdate[field][timeStartStr] = ListFunctionAccessibility[field](timePReached, data)
             else:
                 #print 'else'
-                toUpdate[field] = {timeStartStr : ListFunctionAccessibility[field](timePReached, areaHex)}
+                toUpdate[field] = {timeStartStr : ListFunctionAccessibility[field](timePReached, data)}
         
         #print toUpdate
         if (computeIsochrone):#(gtfsDB['isochrones'].find({'_id':point['_id']}).count() == 0):#
@@ -136,4 +146,4 @@ def computeVel(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, firs
         m = (tot - count)*avgT/(60) - h * 60
 
         count += 1
-        print('point: {0}, Velocity Score : {1:.1f}, time to finish : {2:.1f}h, {3:.1f} m'.format(count, toUpdate['velocityScore'][timeStartStr], h, m), end="\r")
+        print('point: {0}, Velocity Score : {1:.1f}, Sociality Score : {2:.1f}, time to finish : {3:.1f}h, {4:.1f} m'.format(count, toUpdate['velocityScore'][timeStartStr],toUpdate['socialityScore'][timeStartStr], h, m), end="\r")

@@ -189,6 +189,37 @@ def settingHexsPos(gtfsDB, city):
         print ('\r {0}'.format(pos),end="\r")
     gtfsDB['points'].create_index([("pos", pym.ASCENDING)])
 
+
+def setHexsPop(gtfsDB, popCol, namePopField, city):
+    
+    tot = gtfsDB['points'].find({'city':city}).count()
+    count = 0
+    totPop = 0
+
+    for hexagon in gtfsDB['points'].find({'city':city}):
+
+        shapelyHex = Polygon(hexagon['hex']['coordinates'][0])
+        hexagon['hex']['properties'] = {'pop':0}
+        findJson = { 'geometry': { '$geoIntersects': { '$geometry': hexagon['hex']} } }
+        for box in popCol.find(findJson):
+            #box['geometry'] = {}
+            #box['box']['properties']={'pop':box['pop2015']}
+            shapelyBox = Polygon(box['geometry']['coordinates'][0])
+            areaInter = shapelyBox.intersection(shapelyHex).area
+            #print '\r{0}'.format(box['pop'])
+            popHexBox = box['properties'][namePopField] * areaInter/shapelyBox.area
+            hexagon['hex']['properties']['pop'] += popHexBox
+            #geoFolium = folium.GeoJson(box['box'],style_function=style,overlay=True)
+            #map_stops.add_child(geoFolium)
+        count += 1
+        #hexFolium = folium.GeoJson( hex['hex'],style_function=style)
+        #map_stops.add_child(hexFolium)
+        totPop += hexagon['hex']['properties']['pop']
+        gtfsDB['points'].update_one({'_id':hexagon['_id']},{'$set':{'pop':hexagon['hex']['properties']['pop']}})
+        print('{0:.1f}% , tot population: {1:.0f}, current hex: {2:.0f}'.format(100.*count/tot, totPop, hexagon['hex']['properties']['pop']), end="\r")
+
+    
+
     
 def showHexs(gtfsDB, city, zoom_start = 9):
     lonlat = gtfsDB['points'].find_one({'served':True, 'city':city})['point']['coordinates']

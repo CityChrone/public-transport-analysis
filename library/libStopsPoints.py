@@ -291,7 +291,18 @@ def listPointsStopsN(gtfsDB, city):
                 P2PPos[point['pos']][i] = point['pointN'][i]['pos']
                 P2PTime[point['pos']][i] = round(point['pointN'][i]['time'])
         print ('fill point neighbors {0}'.format(point['pos']),end="\r")
-    return [timeS, timeP, S2SPos, S2STime , P2PPos, P2PTime, P2SPos, P2STime]
+        
+    return {
+        'timeS' : timeS, 
+        'timeP' : timeP, 
+        'S2SPos' : S2SPos, 
+        'S2STime' : S2STime , 
+        'P2PPos': P2PPos,
+        'P2PTime' : P2PTime,
+        'P2SPos' : P2SPos, 
+        'P2STime' : P2STime}
+
+
 
 def computeAverage(valuesToAverage, gtfsDB, city):
     count = 0
