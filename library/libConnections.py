@@ -316,13 +316,15 @@ def updateConnectionsStopName(gtfsDB, city):
     c1 = 0
     c2 = 0
     for stop in gtfsDB['stops'].find({'city':city}):
-        res1 = gtfsDB['connections'].update_many({'pStart':stop['stop_id'],'file':stop['file']},{"$set":{'pStart':stop['pos'],"updated":True}})
-        res2 = gtfsDB['connections'].update_many({'pEnd':stop['stop_id'],'file':stop['file']},{"$set":{'pEnd':stop['pos'],"updated":True}})
+        res1 = gtfsDB['connections'].update_many({'pStart':stop['stop_id'],'file':stop['file']},{"$set":{'pStart':stop['pos'],"updatedStart":True}})
+        res2 = gtfsDB['connections'].update_many({'pEnd':stop['stop_id'],'file':stop['file']},{"$set":{'pEnd':stop['pos'],"updatedEnd":True}})
         c1 += res1.modified_count
         c2 += res2.modified_count
         print ('\r{0},{1}-- pStart {2} pEnd {3}, totC {4}'.format(count,tot,c1,c2, totC),end="\r")
         count += 1
-    print("connections deleted",gtfsDB['connections'].delete_many({'city':city, 'updated':{"$exists":False}}).deleted_count)
+    delStart = gtfsDB['connections'].delete_many({'city':city, 'updatedStart':{"$exists":False}}).deleted_count
+    delEnd = gtfsDB['connections'].delete_many({'city':city, 'updatedEnd':{"$exists":False}}).deleted_count
+    print("connections deleted",delEnd + delStart)
     
 def makeArrayConnections(gtfsDB, hStart, city):
     fields = {'tStart':1,'tEnd':1, 'pStart':1, 'pEnd':1, '_id':0 }

@@ -244,7 +244,7 @@ def reduceGeojsonInShell(hexs,field, color = colorIso, shell = shellIso):
     
     for i, lim in enumerate(shell[:-1]):
         listPol = []
-        find = [p['hex'] for p in hexs if (p[field] > shell[i] and p[field] <= shell[i+1])]
+        find = [p for p in hexs if (p[field] > shell[i] and p[field] <= shell[i+1])]
         if len(find) > 0:
             geojson = unionHexs(find)
             geojson['properties'] =  {field: (lim + shell[i+1])/2.}

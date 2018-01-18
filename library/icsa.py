@@ -56,6 +56,23 @@ def coreICSA(timesValues, timeStart, arrayCC, S2SPos, S2STime):
             #print('less!!')
     return timesValues
 
+def coumputeAvgTimeDistance(point, startTimeList, arrayCC, arraySP, gtfsDB, city):
+    
+    timeS = arraySP['timeS']
+    timeP = arraySP['timeP']
+    S2SPos = arraySP['S2SPos']
+    S2STime = arraySP['S2STime']
+    P2PPos = arraySP['P2PPos']
+    P2PTime = arraySP['P2PTime']
+    P2SPos = arraySP['P2SPos']
+    P2STime = arraySP['P2STime']
+    averageTime = numpy.full(len(timeP), 0, dtype = numpy.float64)
+    for startTime in startTimeList:
+        timeP = coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos,P2PTime, P2SPos, P2STime, S2SPos, S2STime)
+        timePReached = timeP - startTime 
+        averageTime += timePReached
+    averageTime /= len(startTimeList)
+    return averageTime 
 
 def coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos, P2PTime,  P2SPos, P2STime, S2SPos, S2STime):
     timeS.fill(inf)  #Inizialize the time of stop
@@ -79,7 +96,7 @@ def coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos, P2PTim
     timeP = computePointTime(timeP, timeS, P2SPos, P2STime)
     return timeP
 
-def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, first):
+def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, first, listAccessibility = ['velocityScore', 'socialityScore', 'velocityScoreGall', 'socialityScoreGall','velocityScore1h', 'socialityScore1h', 'timeVelocity', 'timeSociality']):
     timeS = arraySP['timeS']
     timeP = arraySP['timeP']
     S2SPos = arraySP['S2SPos']
@@ -114,8 +131,8 @@ def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIso
         toUpdate = {}
         timeStartStr = str(startTime)  
         
-        listAccessibility = ['velocityScore', 'socialityScore']
-        data = {'areaHex':areaHex, 'arrayPop':arrayPop}
+        timeListToSave = list(range(900,3600*3+1, 900))
+        data = {'areaHex':areaHex, 'arrayPop':arrayPop, 'timeListToSave' : timeListToSave}
         
         for field in listAccessibility:
             if first:

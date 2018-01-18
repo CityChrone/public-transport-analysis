@@ -306,6 +306,7 @@ def listPointsStopsN(gtfsDB, city):
 
 def computeAverage(valuesToAverage, gtfsDB, city):
     count = 0
+    valuesToAverage = [x for x in valuesToAverage if x[0:4] != "time"]
     for point in gtfsDB['points'].find({'city':city}).sort([('city',1)]):
         newPoint = point
         for field in valuesToAverage:
