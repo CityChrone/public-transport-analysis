@@ -326,7 +326,7 @@ def updateConnectionsStopName(gtfsDB, city):
     delEnd = gtfsDB['connections'].delete_many({'city':city, 'updatedEnd':{"$exists":False}}).deleted_count
     print("connections deleted",delEnd + delStart)
     
-def makeArrayConnections(gtfsDB, hStart, city):
+def makeArrayConnectionsOld(gtfsDB, hStart, city):
     fields = {'tStart':1,'tEnd':1, 'pStart':1, 'pEnd':1, '_id':0 }
     pipeline = [
         {'$match':{'city': city,'tStart':{'$gte':hStart}}},
@@ -348,3 +348,35 @@ def makeArrayConnections(gtfsDB, hStart, city):
             #print('error')
     print( 'Num of connection', len(arrayCC))
     return arrayCC
+
+    
+def makeArrayConnections(gtfsDB, hStart, city):
+    print("start making connections array")
+    fields = {'tStart':1,'tEnd':1, 'pStart':1, 'pEnd':1, '_id':0 }
+    typeMatch = {'city': city,'tStart':{'$gte':hStart},
+                 'tStart': { "$type" : "number" },'tEnd': { "$type" : "number" }, 
+                 'pStart': { "$type" : "number" }, 'pEnd': { "$type" : "number" },}
+    pipeline = [
+        {'$match':typeMatch},
+        {'$sort':{'tStart':1}},
+        {'$project':{'_id':"$_id", "c":['$tStart', '$tEnd','$pStart','$pEnd']}},
+    ]
+    allCC = list(gtfsDB['connections'].aggregate(pipeline))
+    print("done recover all cc", len(allCC))
+    allCC = np.array([x["c"] for x in allCC])
+    print("cenverted")
+    #arrayCC = np.full((gtfsDB['connections'].find({"city":city,'tStart':{'$gte':hStart}}).count(),4),1.,dtype = np.int)
+    #countC = 0
+    #tot = gtfsDB['connections'].find({'tStart':{'$gte':hStart},'city':city}).count()
+    '''for cc in allCC:
+        #if round(cc['tStart']) <=  round(cc['tEnd']) and isinstance(cc['pStart'] , int ) and isinstance(cc['pEnd'] , int ):
+        print(' {0}, {1}, {2}'.format(countC, tot, cc['c']),end="\r");
+        #try:
+        cc['c'] = [round(int(c)) for c in cc['c']]
+        arrayCC[countC] = cc['c'] 
+        countC += 1
+        #except:
+            #print('error')
+    '''
+    print( 'Num of connection', len(allCC))
+    return allCC

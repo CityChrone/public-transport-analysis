@@ -92,8 +92,12 @@ def coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos, P2PTim
     #timeSInit = timeS.copy()
 
     #print("timeS {0},startTime {1},arrayCC {2}, S2SPos {3}, S2STime {4}".format(timeS,startTime,arrayCC, S2SPos, S2STime))
+    #print("setted the initial timeS time... starting core CSA")
     timeS = coreICSA(timeS,startTime,arrayCC, S2SPos, S2STime)
+    #print("ends core CSA... start updating points time")
+
     timeP = computePointTime(timeP, timeS, P2SPos, P2STime)
+    #print("ends points time")
     return timeP
 
 def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIsochrone, first, listAccessibility = ['velocityScore', 'socialityScore', 'velocityScoreGall', 'socialityScoreGall','velocityScore1h', 'socialityScore1h', 'timeVelocity', 'timeSociality']):
@@ -118,13 +122,13 @@ def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIso
     for point in gtfsDB['points'].find({'city':city},projection={'pointN': False, 'stopN':False}).sort([('pos',1)]):
         arrayPop[countPop] = point['pop']
         countPop += 1
-    
+    #print("array pop made")
     for point in gtfsDB['points'].find({'city':city},{'pointN':0, 'stopN':0}).sort([('pos',1)]):
 
         timeStart0 = time.time()
 
         #Inizialize the time of stop and point 
-        
+        #print("starting computation")
         timeP = coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos,P2PTime, P2SPos, P2STime, S2SPos, S2STime)
         timePReached = timeP - startTime    
                         
@@ -134,7 +138,10 @@ def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIso
         timeListToSave = list(range(900,3600*3+1, 900))
         data = {'areaHex':areaHex, 'arrayPop':arrayPop, 'timeListToSave' : timeListToSave}
         
+        #print("starting accessibility quantitites computation")
+
         for field in listAccessibility:
+            #print(field)
             if first:
                 toUpdate[field] = {}
             else:
@@ -155,6 +162,7 @@ def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIso
             geojson = reduceHexsInShell(listHex, 'vAvg', shell = [-1, 0, 900, 1800, 2700, 3600,4500, 5400, 6300,7200, 9000])
             gtfsDB['isochrones'].replace_one({'_id':point['_id']},{'_id':point['_id'],'geojson':geojson, 'city':city},upsert=True)
 
+        #print("end access computaqtion starting updating point")
         gtfsDB['points'].update_one({'_id':point['_id']},{'$set':toUpdate})
 
         totTime += time.time() - timeStart0
