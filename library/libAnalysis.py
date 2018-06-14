@@ -1,4 +1,12 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+import sys
+import seaborn as sns
+import math
+import numpy as np
+from scipy.optimize import curve_fit
+import numpy as np
 
 def distBin(Col, match, field, binStep):
     result = Col.aggregate([{
@@ -22,8 +30,11 @@ def distBin(Col, match, field, binStep):
         y.append(valList[p][field])
     return (x,y)
 
-def expon(xx, a, b):
-    return a * np.exp(-b*xx)
+def expon(xx, tau):
+    return np.exp(-xx/tau)
+
+def expon_two_params(xx, tau, y0):
+    return y0*np.exp(-xx/tau)
 
 def gauss(xx, a, b):
     return a * np.exp(-b*xx**2)
@@ -33,33 +44,63 @@ def giveVarExpon(maxValue):
         return maxValue * np.exp(-b*xx**a)
     return varExpon
 
+def giveVarExponOneVar(maxValue, sigma):
+    def varExpon(xx, a):
+        return maxValue * np.exp(-sigma*xx**a)
+    return varExpon
 
-def fitIt(x,y, funct, p0, nameFunc = "exponential"):
-    from scipy.optimize import curve_fit
-    import numpy as np
+def giveVarExponShift(maxValue, sigma):
+    def varExpon(xx, a, b):
+        return maxValue * np.exp(-sigma*(xx)**a) + b
+    return varExpon
+
+def giveVarExponShift3(maxValue):
+    def varExpon(xx, a, b, sigma):
+        return maxValue * np.exp(-sigma*(xx)**a) + b
+    return varExpon
+
+def stretExp(xx, beta, tau):
+        return np.exp(-(xx / tau)**beta)
+
+def expon3Var(xx, a, b, c):
+    return c * np.exp(-b*(xx)**a)
+
+def powLaw(xx, a, c):
+    return c * (xx + 0.1) ** a 
+
+def powLaw3param(xx, a, b, c):
+    return c * (xx + 0.1 + b) ** a 
+
+def linear_func(xx, alpha, beta):
+    return beta*xx + alpha
+
+def linear(xx, beta, alpha):
+    return beta*xx + alpha
+
+def linear_func_one_param(xx, beta):
+    return beta*xx
+
+
+def fitIt(x,y, funct, p0, nameFunc = "exponential", bounds = False):
 
     xx=np.array(x)
     yy=np.array(y)
-    
-    popt, pcov = curve_fit(funct, xx, yy, p0 = p0)
-    yAvg = np.array(sum(yy)/len(yy))
-    SStot = sum((yy-yAvg)**2)
-    SSreg = sum((yy-funct(xx, *popt))**2)
+    if not bounds:
+        popt, pcov = curve_fit(funct, xx, yy, p0 = p0, maxfev = 100000)
+    else:
+        popt, pcov = curve_fit(funct, xx, yy, p0 = p0, maxfev = 100000, bounds = bounds)
+    yAvg = np.array(np.mean(yy))
+    SStot = np.sum((yy-yAvg)**2)
+    SSreg = np.sum((yy-funct(xx, *popt))**2)
+    square_dist = np.sum(np.abs(yy-funct(xx, *popt)))/len(yy)
     R2 = 1 - (SSreg/SStot)
     stringtoPrint = "r2 = {0}".format(R2)
-    stringtoPrint += "\na = {0:.2f}".format(popt[0])
-    stringtoPrint +="\nb = {0:.2f}".format(popt[1])
+    for i, val in enumerate(popt):
+        stringtoPrint += "\nParam_"+ str(i)+" = {0:.2f}".format(val)
     #print(stringtoPrint)
-    return (popt, R2)
+    return (popt, R2, square_dist)
 
-def fitAndPlot(quantity, timeDist, gtfsDB, city, funct, p0 = [1,1], nameFunc = "exponential"):
-    import matplotlib.pyplot as plt
-    import matplotlib
-    import sys
-    import seaborn as sns
-    import math
-    import numpy as np
-    from libAnalysis import fitIt
+def fitAndPlot(quantity, timeDist, gtfsDB, city, funct, p0 = [1,1], nameFunc = "exponential", bounds = False):
     sns.set_style("ticks")
     sns.set_context("paper", font_scale=2)
     fig = plt.figure(figsize=(17, 9))
@@ -67,14 +108,18 @@ def fitAndPlot(quantity, timeDist, gtfsDB, city, funct, p0 = [1,1], nameFunc = "
 
     x = []
     y = []
+    time_limit_new = 3600*2
     for p in gtfsDB['points'].find({'city':city},{quantity:1,timeDist:1}).sort([('pos',1)]):
-        if p[timeDist] < 15000:
-            x.append(p[timeDist])
-            y.append(p[quantity]['avg'])
+        if p[timeDist] < time_limit_new:
+            x.append(p[timeDist] / 3600)
+            if isinstance(p[quantity], dict):
+                y.append(p[quantity]['avg'])
+            else:
+                y.append(p[quantity])
     x=np.array(x)
     y=np.array(y)
-    xfine = np.linspace(0., 15000., 15000) 
-    bins = 300
+    xfine = np.linspace(0., time_limit_new/3600, 10000) 
+    bins = 40
     resFrq = np.histogram(x, bins=bins)
     res = np.histogram(x, bins=bins, weights=y)
 
@@ -88,26 +133,75 @@ def fitAndPlot(quantity, timeDist, gtfsDB, city, funct, p0 = [1,1], nameFunc = "
 
     plt.subplot(3,2,1)
     plt.plot(x, y, '.')
-    (popt, R2) = fitIt(x,y,funct, p0)
-    stringtoPrint = "exponential"
+    (popt, R2) = fitIt(x,y,funct, p0, bounds = bounds)
+    stringtoPrint = "exponential \n"
     stringtoPrint += "r2 = {0:.4f}".format(R2)
-    stringtoPrint += "\na = {0:.2E}".format(popt[0])
-    stringtoPrint +="\nb = {0:.2E}".format(popt[1])
+    for i, val in enumerate(popt):
+        stringtoPrint += "\nParam_"+ str(i)+" = {0:.2f}".format(val)
     fitLine = plt.plot(xfine, funct(xfine, *popt), '-', linewidth=3, label=stringtoPrint)
     plt.legend()
 
     plt.subplot(3,2,2)
-    (popt_hist, R2_hist) = fitIt(fitHistX,fitHistY, funct, p0)
+    (popt_hist, R2_hist) = fitIt(fitHistX,fitHistY, funct, p0,  bounds = bounds)
     stringtoPrint = "r2 = {0:.4f}".format(R2_hist)
-    stringtoPrint += "\na = {0:.2E}".format(popt_hist[0])
-    stringtoPrint +="\nb = {0:.2E}".format(popt_hist[1])
+    for i, val in enumerate(popt_hist):
+        stringtoPrint += "\nParam_"+ str(i)+" = {0:.2f}".format(val)
     plt.plot(xfine, funct(xfine, *popt_hist), '-', linewidth=3, label=stringtoPrint)
     plt.plot(fitHistX, fitHistY, 'g-', label="histogram")
+    #plt.semilogy()
     plt.legend()
 
     plt.show()
     return {'hist':{'R2':R2_hist, 'popt': popt_hist}, 'points':{'R2':R2, 'popt': popt}}
 
+def fitAndPlotLinear(x, y, bins = 30, p0=[1,0]):
+
+    n, _ = np.histogram(x, bins=bins)
+    sy, _ = np.histogram(x, bins=bins, weights=y)
+    sy2, _ = np.histogram(x, bins=bins, weights=y*y)
+    mean = []
+    std = []
+    
+    centers_bin = []
+    for i in range(len(sy)):
+        if n[i] > 10:
+            mean.append(sy[i] / n[i])
+            ii = len(mean) - 1
+            std.append(np.sqrt(sy2[i]/n[i] - mean[ii]*mean[ii] + 0.000001))
+            centers_bin.append((_[i] + _[i+1])/2)
+        #else:
+            #mean.append(0.)
+            #std.append(0.)
+    
+    std = np.array(std)
+    mean = np.array(mean)
+    centers_bin = np.array(centers_bin)
+
+    funct = linear_func
+
+    (popt, R2) = fitIt(x, y, funct,p0)
+    (popt_hist, R2_hist) = fitIt(centers_bin,mean, funct, p0)
+
+    stringtoPrint = "r2 = {0:.4f}".format(R2)
+    stringtoPrint_hist = "r2 = {0:.4f}".format(R2_hist)
+
+    stringtoPrint += "\n alpha = {0:.2f}".format(popt[0])
+    stringtoPrint += "\n beta = {0:.2f}".format(popt[1])
+    stringtoPrint_hist += "\n alpha = {0:.2f}".format(popt_hist[0])
+    stringtoPrint_hist += "\n beta = {0:.2f}".format(popt_hist[1])
+
+
+    xfine = np.linspace(centers_bin[0], max(x), 1000) 
+    (fig, axs) = plt.subplots(1,2, figsize=(10,4))
+    axs[0].plot(x, y, '.')
+    axs[0].plot(xfine, funct(xfine, *popt), '-', linewidth=3, label=stringtoPrint)
+    axs[1].plot(centers_bin, mean, marker="o", ls="none" ,label="histogram", )
+    axs[1].plot(xfine, funct(xfine, *popt_hist), '-', linewidth=3, label=stringtoPrint_hist)
+    axs[0].legend()
+    axs[1].legend()
+
+    plt.show()
+    return {"fit":(popt.tolist(), R2), "fit_hist":(popt_hist.tolist(), R2_hist)}
 
 def allTimeDist(quantity,timeDist, gtfsDB, city):
     import matplotlib.pyplot as plt

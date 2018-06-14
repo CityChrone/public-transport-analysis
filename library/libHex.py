@@ -108,8 +108,8 @@ def hexagonalGrid(bbox, cell,gtfsDBStops, distanceS, city):
                                  })
                 fc.append(myhex)
                 count_ins+=1
-                    
-            print ('{0:.1f}%, tot = {1}, inserted = {2}'.format(100.*(float(x*y_count)+float(y))/(x_count*y_count),(float(x*y_count)+float(y)) , count_ins), end="\r")
+            if count_ins %10 == 0:  
+                print ('{0:.1f}%, tot = {1}, inserted = {2}'.format(100.*(float(x*y_count)+float(y))/(x_count*y_count),(float(x*y_count)+float(y)) , count_ins), end="\r")
     
     return MultiPolygon(fc), listPoint
 
@@ -162,7 +162,7 @@ def pointsServed(gtfsDB, stopsList, urlServerOsrm, distanceS, tS, city):
         print ('\r tot {0}, {1:.2f}%, updated {2}'.format(tot, 100.*count/tot, updatedPoints),end="\r")
         count += 1
         
-        tot = hexTemp.find({'served':True, 'city':city}).count()
+    tot = hexTemp.find({'served':True, 'city':city}).count()  
     count = 0
     coorHex =  hexTemp.find_one({'city':city, 'served': True})['hex']['coordinates']
     distMax = 1.1 * 1000. * dist2Point(coorHex[0][0], coorHex[0][1])

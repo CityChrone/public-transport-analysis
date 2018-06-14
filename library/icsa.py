@@ -67,9 +67,13 @@ def coumputeAvgTimeDistance(point, startTimeList, arrayCC, arraySP, gtfsDB, city
     P2SPos = arraySP['P2SPos']
     P2STime = arraySP['P2STime']
     averageTime = numpy.full(len(timeP), 0, dtype = numpy.float64)
+    maxTime = 24*3600
     for startTime in startTimeList:
         timeP = coumputeTimeOnePoint(point, startTime, timeS, timeP, arrayCC, P2PPos,P2PTime, P2SPos, P2STime, S2SPos, S2STime)
         timePReached = timeP - startTime 
+        for i,t in enumerate(timePReached):
+            if t > maxTime:
+                timePReached[i] = maxTime
         averageTime += timePReached
     averageTime /= len(startTimeList)
     return averageTime 
@@ -123,7 +127,7 @@ def computeAccessibilities(city, startTime, arrayCC, arraySP, gtfsDB, computeIso
         arrayPop[countPop] = point['pop']
         countPop += 1
     #print("array pop made")
-    for point in gtfsDB['points'].find({'city':city},{'pointN':0, 'stopN':0}).sort([('pos',1)]):
+    for point in gtfsDB['points'].find({'city':city},{'pointN':0, 'stopN':0}, no_cursor_timeout=True).sort([('pos',1)]):
 
         timeStart0 = time.time()
 

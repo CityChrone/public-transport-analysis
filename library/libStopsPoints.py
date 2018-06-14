@@ -55,7 +55,6 @@ def removingStopsNoConnections(gtfsDB, city):
         print( '{0}-removed stops{1}'.format(count, count_rem),end="\r")
         count += 1
 
-
 def setPosField(gtfsDB, city):
     pos = 0
     for stop in gtfsDB['stops'].find({'city':city}).sort([('_id', pym.ASCENDING)]):
@@ -72,6 +71,29 @@ def setPosField(gtfsDB, city):
     gtfsDB['stops'].create_index([("pos", pym.ASCENDING)])
     gtfsDB['stops'].create_index([("point", pym.GEOSPHERE)])
 
+
+def removeStopsOutBorder(gtfsDB, city, dbNameBorder, listFieldBorders):
+    setPosField(gtfsDB, city)
+    cityData = gtfsDB[dbNameBorder].find_one({'city':city})
+    tot = gtfsDB[dbNameBorder].find().count()
+    count = 0
+    stops = gtfsDB['stops']
+    numCity = stops.find({'city':city}).count()   
+    if cityData != []: 
+        print("city founded {0} -- {1}".format(cityData['city'], numCity))
+        for f in listFieldBorders:
+            if f in cityData:
+                cityBorder = cityData[f]['geometry']
+                findStopsInCity = { 'city':city, 'point': { '$geoIntersects': { '$geometry': cityBorder} } }
+                resComm = gtfsDB['stops'].update_many(findStopsInCity, {'$set':{'inCityBorder':True}})
+                print(f, " number of stops:{0}".format(resComm.matched_count))
+    else:
+        print("city {0} not founded".format(city))
+    removed = gtfsDB['stops'].delete_many({'city':city, 'inCityBorder':{'$exists':False}})  
+    print("number of stops removed {0}".format(removed.deleted_count))
+    return removed
+
+    
 def returnStopsList(gtfsDB, city):
     stopsList = []
     count_err = 0
@@ -314,9 +336,11 @@ def computeAverage(valuesToAverage, gtfsDB, city):
             c = 0.
             for t in newPoint[field]:
                 if t not in ['errStd', 'maxDiff', 'avg']:
-                    tot += newPoint[field][t]
-                    c += 1.
+                    if int(t) > 5*3600:
+                        tot += newPoint[field][t]
+                        c += 1.
                     #print field, newPoint[field][t]
+                    
             newPoint[field]['avg'] = tot / c if c != 0 else 0
 
         for field in valuesToAverage:
@@ -324,9 +348,10 @@ def computeAverage(valuesToAverage, gtfsDB, city):
             newPoint[field]['errStd'] = 0
             for t in newPoint[field]:
                 if t not in ['errStd', 'maxDiff', 'avg']:
-                    diff = math.fabs(newPoint[field][t] - newPoint[field]['avg'])
-                    newPoint[field]['maxDiff'] = max(newPoint[field]['maxDiff'], diff)
-                    newPoint[field]['errStd'] += math.pow(diff,2)
+                    if int(t) > 5*3600:
+                        diff = math.fabs(newPoint[field][t] - newPoint[field]['avg'])
+                        newPoint[field]['maxDiff'] = max(newPoint[field]['maxDiff'], diff)
+                        newPoint[field]['errStd'] += math.pow(diff,2)
             n = len(newPoint[field])
             newPoint[field]['errStd'] = math.sqrt(newPoint[field]['errStd'] / (n * (n-1)))
             #print field
