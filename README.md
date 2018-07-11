@@ -1,4 +1,4 @@
-latest release : [![DOI](https://zenodo.org/badge/104480172.svg)](https://zenodo.org/badge/latestdoi/104480172)
+[![DOI](https://zenodo.org/badge/104480172.svg)](https://zenodo.org/badge/latestdoi/104480172)
 # public-transport-analysis
 Urban Public transport analysis.
 This repository contains a jupyter notebook and all the related libraries to perform some of the analysis shown  in the <a href="http://citychrone.org" target="_blank">CityChrone platform</a> and compute the data nedeed to add new city in the CityChrone platform.
