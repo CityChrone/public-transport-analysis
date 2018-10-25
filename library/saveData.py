@@ -4,7 +4,7 @@ from libHex import area_geojson
 from libConnections import makeArrayConnections
 import os
 
-def listOfNeighbor(gtfsDB, city):
+def listOfNeighbor(gtfsDB, city, limit_walking_time = 900):
     S2SPos = []
     S2STime = []
     P2PPos = []
@@ -12,12 +12,14 @@ def listOfNeighbor(gtfsDB, city):
     P2SPos = []
     P2STime = []
     count_error = 0
-    for stop in gtfsDB['stops'].find({'city':city}).sort([('pos',1)]):
-        S2SPos.append([0]*len(stop['stopN']))
-        S2STime.append([0]*len(stop['stopN']))
+    for stop in gtfsDB['stops'].find({'city':city}).sort([('pos',1)]):       
+        S2SPos.append([])
+        S2STime.append([])
         for i,stopN in enumerate(stop['stopN']):
-            S2SPos[stop['pos']][i] = stop['stopN'][i]['pos']
-            S2STime[stop['pos']][i] = round(stop['stopN'][i]['time'])
+            time_walk = round(stop['stopN'][i]['time'])
+            if time_walk <= limit_walking_time:
+                S2SPos[stop['pos']].append(stop['stopN'][i]['pos'])
+                S2STime[stop['pos']].append(stop['stopN'][i]['time'])
         print ('fill stop neighbors {0}'.format(stop['pos']),end="\r")
 
     for point in gtfsDB['points'].find({'city':city}).sort([('pos',1)]):        
@@ -42,9 +44,11 @@ def listOfNeighbor(gtfsDB, city):
         'P2STime' : P2STime}
 
 
-def makeZipCitychrone(city, gtfsDB, arrayCC = [], path = './saved/', newScenario = False, budget = 5000, costTubeKm = 30, costMetroStop=100, metroLines = [], urlServerOsrm = 'localhost:5000'):
-    
-    a  = zipfile.ZipFile(path+city+'_citychrone.zip',  mode = 'w', compression=zipfile.ZIP_DEFLATED)
+def makeZipCitychrone(city, gtfsDB, arrayCC = [], path_main = './saved/', newScenario = False, budget = 5000, costTubeKm = 30, costMetroStop=100, metroLines = [], urlServerOsrm = 'localhost:5000', limit_walking_time = 900):
+    path = path_main + city + "/"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    a  = zipfile.ZipFile(path_main+city+'_citychrone.zip',  mode = 'w', compression=zipfile.ZIP_DEFLATED)
 
     if len(arrayCC) == 0:
         arrayCC = makeArrayConnections(gtfsDB, 7*3600, city)
@@ -60,7 +64,7 @@ def makeZipCitychrone(city, gtfsDB, arrayCC = [], path = './saved/', newScenario
         a.write(path+'connections.txt', 'connections.txt')
     os.remove(path+'connections.txt')
 
-    listN = listOfNeighbor(gtfsDB, city)
+    listN = listOfNeighbor(gtfsDB, city, limit_walking_time)
     for name in listN:
         with open(path + name + '.txt', 'w') as nFile:
             jsonStr = json.dumps(listN[name])
@@ -119,3 +123,4 @@ def makeZipCitychrone(city, gtfsDB, arrayCC = [], path = './saved/', newScenario
         a.write(path + 'cityData.txt', 'cityData.txt')
     os.remove(path + 'cityData.txt')
     a.close()
+    os.rmdir(os.path.dirname(path))
