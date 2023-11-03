@@ -1,46 +1,35 @@
 [![DOI](https://zenodo.org/badge/104480172.svg)](https://zenodo.org/badge/latestdoi/104480172)
-# public-transport-analysis
-Urban Public transport analysis.
-This repository contains a jupyter notebook and all the related libraries to perform some of the analysis shown  in the <a href="http://citychrone.org" target="_blank">CityChrone platform</a> and compute the data nedeed to add new city in the CityChrone platform.
+# Public Transport Analysis
+Urban Public Transport Analysis.
 
-Take a look at the <a href="http://nbviewer.jupyter.org/github/ocadni/public-transport-analysis/blob/master/public-transport-city.ipynb" target="_blank">demo</a> of the notebook for the city of Budapest.
+This repository hosts a Jupyter notebook along with all requisite libraries to conduct analyses similar to those showcased on the [CityChrone platform](http://citychrone.org). It also includes resources necessary to integrate new cities into the CityChrone platform.
 
-![budapest image](./budapest.png)
+Explore the [demo notebook](http://nbviewer.jupyter.org/github/ocadni/public-transport-analysis/blob/master/public_transport_analysis.ipynb) featuring an analysis for the city of Turin.
+
+![Image of Budapest](./turin.png)
 
 ## Prerequisites
-1. [python 3.x](https://www.python.org/download/releases/3.0/)
-1. [jupyter](http://jupyter.org/)
-1. [MongoDB](https://www.mongodb.com/download-center#community) with the privileges to create and modified a database.
-1. An [osrm-backend](https://github.com/Project-OSRM/osrm-backend) server for computing the walking path.
-1. All the python library needed, listed at the beginning of the notebook.
+To utilize this repository, ensure you have the following installed:
+1. [Python 3.x](https://www.python.org/download/releases/3.0/)
+2. [Jupyter](http://jupyter.org/)
+3. [MongoDB](https://www.mongodb.com/download-center#community) with privileges to create and modify databases.
+5. All Python libraries listed in requirements.txt.
+
 ### Optional
-For computing the "Sociality Score" the population distribution in the city is nedeed. The population distribution can be download for instance from [SEDAC](http://sedac.ciesin.columbia.edu/data/collection/gpw-v4) or for Europe form [EUROSTAT](http://ec.europa.eu/eurostat/statistics-explained/index.php/Population_grids). The public-transport-analysis notebook automatically project the population in a specific tesselletion to the hexagons tesselletions used. The population in each hexagons will be the sum of the population of the overlapping sections proportional to overlapping area.
-The population must be stored in a mongodb collections, where each element is a Future of [geojson](https://docs.mongodb.com/manual/reference/geojson/) and in the field "geometry" there should be the a Polygon geometry of the corresponding section. Then the value of the population must be stored in the sub-field of the "properties" field of the element.
+For calculating the "Sociality Score", you'll need the city's population distribution. This data can be sourced from [SEDAC](http://sedac.ciesin.columbia.edu/data/collection/gpw-v4) or for Europe, from [EUROSTAT](http://ec.europa.eu/eurostat/statistics-explained/index.php/Population_grids). Our notebook automatically projects the population onto a specified tessellation, summing populations of overlapping sections proportionally to their overlapping areas. The population data must be stored in a MongoDB collection with each element being a Feature of [geojson](https://docs.mongodb.com/manual/reference/geojson/), containing a Polygon geometry in the "geometry" field, and the population value in a sub-field of the "properties" field.
 
-## installation
-1. clone the repository.
-1. Download [openstreetmap](openstreetmap.org) extract (the .pbf file) of the city/region of interest. ->[repository of osm extract: [geofabrik](http://download.geofabrik.de/)).
-1. Save the extract in the folder "osrm" of the current repository. Run on the terminal in osrm folder (Compile the street graph and run the osrm backend):
-	1. ```osrm-extract -p ./profiles/foot.lua budapest_hungary.osm.pbf```
-	1. ```osrm-contract budapest_hungary.osm.pbf```
-	1. ```osrm-routed budapest_hungary.osrm --port 5000```
     
-## Compute travel time distances and all the accessbility quantities
-1. run ```jupyter-notebook``` and open the public-transport-analysis notebook.
-1. Set the variable listed at the start of the notebook:
-	1. ```city = 'Budapest' # name of the city```
-	2. ```urlMongoDb = "mongodb://localhost:27017/"; # url of the mongodb database```
-	3. ```directoryGTFS = './gtfs/'+ city+ '/' # directory of the gtfs files.```
-	4. ```day = "20170607" #hhhhmmdd [date validity of gtfs files]```
-	5. ```dayName = "wednesday" #name of the corresponding day```
-	6. ```urlServerOsrm = 'http://localhost:5000/'; #url of the osrm server of the city```
-    \[\Optional -- population collection]
-    7. ```urlMongoDbPop = "mongodb://localhost:27017/"; # url of the mongodb database of population data```
-    8. ```popDbName = "" #name of the population database```
-    9. ```popCollectionName = ""#name of the population collection```
-    10. ```popField = ""#the field in the properties field in the elements containing the value of the population```
-1. run the cells in the notebook.
+## Computing Travel Time Distances and Accessibility Metrics
+1. Launch the notebook with `jupyter-notebook` and open the public-transport-analysis notebook.
+2. Set the variables listed at the start of the notebook:
+    1. `city = 'Turin' # name of the city`
+    2. `urlMongoDb = "mongodb://localhost:27017/"; # URL of the MongoDB database`
+    3. `directoryGTFS = './gtfs/'+ city+ '/' # directory of the GTFS files`
+    4. `day = "20170607" # YYYYMMDD format [date validity of GTFS files]`
+    5. `dayName = "wednesday" # name of the corresponding day`
+    3. Execute the cells within the notebook.
 
+## Citation
+If you utilize this repository for your research, please cite the following paper:
 
-
-
+Biazzo Indaco, Monechi Bernardo, and Loreto Vittorio. "General scores for accessibility and inequality measures in urban areas." R. Soc. open sci.6 (2019): 190979. [DOI: 10.1098/rsos.190979](http://doi.org/10.1098/rsos.190979).
